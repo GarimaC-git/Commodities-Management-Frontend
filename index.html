@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slooze - Commodities Management</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+  <div id="app"></div>
+
+  <script type="module">
+    import { h, render, Component } from 'https://unpkg.com/preact@latest?module';
+    import { useState, useEffect } from 'https://unpkg.com/preact@latest/hooks/dist/hooks.module.js?module';
+    import htm from 'https://unpkg.com/htm?module';
+    const html = htm.bind(h);
+
+    // Mock Data
+    const USERS = [
+      { id: 1, email: 'manager@slooze.xyz', password: 'manager123', role: 'Manager', name: 'John Manager' },
+      { id: 2, email: 'keeper@slooze.xyz', password: 'keeper123', role: 'Store Keeper', name: 'Jane Keeper' }
+    ];
+
+    const INITIAL_PRODUCTS = [
+      { id: 1, name: 'Coffee Beans', category: 'Beverages', quantity: 150, price: 12.99, supplier: 'Bean Co.' },
+      { id: 2, name: 'Sugar', category: 'Dry Goods', quantity: 300, price: 2.49, supplier: 'Sweet Supply' },
+      { id: 3, name: 'Flour', category: 'Dry Goods', quantity: 200, price: 3.99, supplier: 'Mill Direct' },
+      { id: 4, name: 'Olive Oil', category: 'Oils', quantity: 80, price: 15.99, supplier: 'Mediterranean Oils' },
+      { id: 5, name: 'Rice', category: 'Grains', quantity: 500, price: 8.99, supplier: 'Grain Traders' }
+    ];
+
+    // Icons as SVG
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const icons = {
+        package: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>`,
+        home: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>`,
+        logout: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>`,
+        sun: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>`,
+        moon: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>`,
+        plus: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>`,
+        edit: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>`,
+        trash: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>`,
+        eye: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>`,
+        eyeOff: html`<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>`
+      };
+      return icons[name] || html`<span></span>`;
+    };
+
+    // Login Component
+    function LoginPage({ onLogin }) {
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [showPassword, setShowPassword] = useState(false);
+      const [error, setError] = useState('');
+
+      const handleLogin = () => {
+        const user = USERS.find(u => u.email === email && u.password === password);
+        if (user) {
+          onLogin(user);
+        } else {
+          setError('Invalid credentials');
+        }
+      };
+
+      const quickLogin = (userEmail) => {
+        const user = USERS.find(u => u.email === userEmail);
+        if (user) onLogin(user);
+      };
+
+      return html`
+        <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 to-blue-100 dark:from-gray-900 dark:to-gray-800 p-4">
+          <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+              <div class="w-16 h-16 bg-purple-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+                <${Icon} name="package" className="w-8 h-8 text-white" />
+              </div>
+              <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Slooze</h1>
+              <p class="text-gray-600 dark:text-gray-400">Commodities Management</p>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                <input
+                  type="email"
+                  value=${email}
+                  onInput=${(e) => setEmail(e.target.value)}
+                  onKeyPress=${(e) => e.key === 'Enter' && handleLogin()}
+                  class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="your@email.com"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+                <div class="relative">
+                  <input
+                    type=${showPassword ? 'text' : 'password'}
+                    value=${password}
+                    onInput=${(e) => setPassword(e.target.value)}
+                    onKeyPress=${(e) => e.key === 'Enter' && handleLogin()}
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    onClick=${() => setShowPassword(!showPassword)}
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  >
+                    <${Icon} name=${showPassword ? 'eyeOff' : 'eye'} />
+                  </button>
+                </div>
+              </div>
+
+              ${error && html`<div class="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-4 py-2 rounded-lg text-sm">${error}</div>`}
+
+              <button
+                onClick=${handleLogin}
+                class="w-full bg-purple-600 text-white py-2 rounded-lg font-semibold hover:bg-purple-700"
+              >
+                Sign In
+              </button>
+            </div>
+
+            <div class="mt-6 space-y-2">
+              <p class="text-sm text-gray-600 dark:text-gray-400 font-semibold">Quick Login:</p>
+              <button
+                onClick=${() => quickLogin('manager@slooze.xyz')}
+                class="w-full text-left p-3 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                <p class="font-medium text-gray-900 dark:text-white">👔 Manager</p>
+                <p class="text-xs text-gray-500">manager@slooze.xyz / manager123</p>
+              </button>
+              <button
+                onClick=${() => quickLogin('keeper@slooze.xyz')}
+                class="w-full text-left p-3 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                <p class="font-medium text-gray-900 dark:text-white">📦 Store Keeper</p>
+                <p class="text-xs text-gray-500">keeper@slooze.xyz / keeper123</p>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Dashboard Component
+    function Dashboard({ products }) {
+      const totalProducts = products.length;
+      const totalValue = products.reduce((sum, p) => sum + (p.quantity * p.price), 0);
+      const lowStock = products.filter(p => p.quantity < 150).length;
+
+      const categories = {};
+      products.forEach(p => {
+        categories[p.category] = (categories[p.category] || 0) + p.quantity;
+      });
+
+      return html`
+        <div class="space-y-6">
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+            <p class="text-gray-600 dark:text-gray-400">Overview of your inventory</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+              <p class="text-sm text-gray-600 dark:text-gray-400">Total Products</p>
+              <p class="text-3xl font-bold text-gray-900 dark:text-white">${totalProducts}</p>
+            </div>
+            
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+              <p class="text-sm text-gray-600 dark:text-gray-400">Inventory Value</p>
+              <p class="text-3xl font-bold text-gray-900 dark:text-white">$${totalValue.toFixed(2)}</p>
+            </div>
+            
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-red-500">
+              <p class="text-sm text-gray-600 dark:text-gray-400">Low Stock Items</p>
+              <p class="text-3xl font-bold text-gray-900 dark:text-white">${lowStock}</p>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Inventory by Category</h2>
+            <div class="space-y-3">
+              ${Object.entries(categories).map(([category, quantity]) => html`
+                <div key=${category} class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <span class="font-medium text-gray-900 dark:text-white">${category}</span>
+                  <span class="text-purple-600 dark:text-purple-400 font-bold">${quantity} units</span>
+                </div>
+              `)}
+            </div>
+          </div>
+
+          ${lowStock > 0 && html`
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+              <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">⚠️ Low Stock Alerts</h2>
+              ${products.filter(p => p.quantity < 150).map(product => html`
+                <div key=${product.id} class="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg mb-2">
+                  <div>
+                    <p class="font-semibold text-gray-900 dark:text-white">${product.name}</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">${product.category}</p>
+                  </div>
+                  <span class="text-red-600 dark:text-red-400 font-bold">${product.quantity} units</span>
+                </div>
+              `)}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    // Products Component
+    function ProductsPage({ products, setProducts }) {
+      const [showForm, setShowForm] = useState(false);
+      const [editingId, setEditingId] = useState(null);
+      const [form, setForm] = useState({ name: '', category: '', quantity: '', price: '', supplier: '' });
+
+      const handleSubmit = () => {
+        if (!form.name || !form.category || !form.quantity || !form.price || !form.supplier) {
+          alert('Please fill all fields');
+          return;
+        }
+        
+        if (editingId) {
+          setProducts(products.map(p => 
+            p.id === editingId 
+              ? { ...form, id: editingId, quantity: Number(form.quantity), price: Number(form.price) }
+              : p
+          ));
+        } else {
+          const newProduct = {
+            ...form,
+            id: Math.max(...products.map(p => p.id), 0) + 1,
+            quantity: Number(form.quantity),
+            price: Number(form.price)
+          };
+          setProducts([...products, newProduct]);
+        }
+        
+        setForm({ name: '', category: '', quantity: '', price: '', supplier: '' });
+        setShowForm(false);
+        setEditingId(null);
+      };
+
+      const handleEdit = (product) => {
+        setForm({
+          name: product.name,
+          category: product.category,
+          quantity: String(product.quantity),
+          price: String(product.price),
+          supplier: product.supplier
+        });
+        setEditingId(product.id);
+        setShowForm(true);
+      };
+
+      const handleDelete = (id) => {
+        if (confirm('Delete this product?')) {
+          setProducts(products.filter(p => p.id !== id));
+        }
+      };
+
+      return html`
+        <div class="space-y-6">
+          <div class="flex justify-between items-center">
+            <div>
+              <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Products</h1>
+              <p class="text-gray-600 dark:text-gray-400">Manage your inventory</p>
+            </div>
+            <button
+              onClick=${() => setShowForm(true)}
+              class="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
+            >
+              <${Icon} name="plus" />
+              Add Product
+            </button>
+          </div>
+
+          ${showForm && html`
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+              <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                ${editingId ? 'Edit Product' : 'Add New Product'}
+              </h2>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Product Name</label>
+                  <input
+                    type="text"
+                    value=${form.name}
+                    onInput=${(e) => setForm({...form, name: e.target.value})}
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Category</label>
+                  <input
+                    type="text"
+                    value=${form.category}
+                    onInput=${(e) => setForm({...form, category: e.target.value})}
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quantity</label>
+                  <input
+                    type="number"
+                    value=${form.quantity}
+                    onInput=${(e) => setForm({...form, quantity: e.target.value})}
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Price ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value=${form.price}
+                    onInput=${(e) => setForm({...form, price: e.target.value})}
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Supplier</label>
+                  <input
+                    type="text"
+                    value=${form.supplier}
+                    onInput=${(e) => setForm({...form, supplier: e.target.value})}
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div class="md:col-span-2 flex gap-3">
+                  <button 
+                    onClick=${handleSubmit}
+                    class="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
+                  >
+                    ${editingId ? 'Update' : 'Add'} Product
+                  </button>
+                  <button
+                    onClick=${() => {
+                      setShowForm(false);
+                      setEditingId(null);
+                      setForm({ name: '', category: '', quantity: '', price: '', supplier: '' });
+                    }}
+                    class="px-6 py-2 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-400 dark:hover:bg-gray-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          `}
+
+          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="bg-gray-100 dark:bg-gray-700">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Product</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Category</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Quantity</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Price</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Supplier</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                  ${products.map((product) => html`
+                    <tr key=${product.id} class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">${product.name}</td>
+                      <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">${product.category}</td>
+                      <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">${product.quantity}</td>
+                      <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">$${product.price}</td>
+                      <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">${product.supplier}</td>
+                      <td class="px-6 py-4">
+                        <div class="flex gap-2">
+                          <button
+                            onClick=${() => handleEdit(product)}
+                            class="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg"
+                          >
+                            <${Icon} name="edit" className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick=${() => handleDelete(product.id)}
+                            class="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                          >
+                            <${Icon} name="trash" className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `)}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Main App
+    function App() {
+      const [user, setUser] = useState(null);
+      const [currentPage, setCurrentPage] = useState('dashboard');
+      const [isDark, setIsDark] = useState(false);
+      const [products, setProducts] = useState(INITIAL_PRODUCTS);
+
+      useEffect(() => {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+          setIsDark(true);
+          document.documentElement.classList.add('dark');
+        }
+      }, []);
+
+      const toggleTheme = () => {
+        setIsDark(!isDark);
+        if (!isDark) {
+          document.documentElement.classList.add('dark');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+          localStorage.setItem('theme', 'light');
+        }
+      };
+
+      const handleLogin = (userData) => {
+        setUser(userData);
+        setCurrentPage(userData.role === 'Manager' ? 'dashboard' : 'products');
+      };
+
+      const handleLogout = () => {
+        setUser(null);
+        setCurrentPage('dashboard');
+      };
+
+      if (!user) {
+        return html`<${LoginPage} onLogin=${handleLogin} />`;
+      }
+
+      const canAccessDashboard = user.role === 'Manager';
+
+      return html`
+        <div class="min-h-screen bg-gray-100 dark:bg-gray-900">
+          <header class="bg-white dark:bg-gray-800 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
+                    <${Icon} name="package" className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 class="text-lg font-bold text-gray-900 dark:text-white">Slooze</h1>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">${user.role}</p>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                  <button
+                    onClick=${toggleTheme}
+                    class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    ${isDark 
+                      ? html`<${Icon} name="sun" className="w-5 h-5 text-yellow-400" />`
+                      : html`<${Icon} name="moon" className="w-5 h-5 text-gray-700" />`
+                    }
+                  </button>
+                  
+                  <div class="text-right">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">${user.name}</p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">${user.email}</p>
+                  </div>
+                  
+                  <button
+                    onClick=${handleLogout}
+                    class="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
+                  >
+                    <${Icon} name="logout" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <nav class="mb-8 flex gap-2">
+              <button
+                onClick=${() => canAccessDashboard && setCurrentPage('dashboard')}
+                disabled=${!canAccessDashboard}
+                class="${currentPage === 'dashboard' && canAccessDashboard
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : !canAccessDashboard
+                  ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                } flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all"
+              >
+                <${Icon} name="home" />
+                Dashboard
+                ${!canAccessDashboard && html`<span class="text-xs">(Manager Only)</span>`}
+              </button>
+              
+              <button
+                onClick=${() => setCurrentPage('products')}
+                class="${currentPage === 'products'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                } flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all"
+              >
+                <${Icon} name="package" />
+                Products
+              </button>
+            </nav>
+
+            ${currentPage === 'dashboard' && canAccessDashboard && html`<${Dashboard} products=${products} />`}
+            ${currentPage === 'dashboard' && !canAccessDashboard && html`
+              <div class="bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-800 rounded-xl p-8 text-center">
+                <h2 class="text-2xl font-bold text-red-600 dark:text-red-400 mb-2">Access Denied</h2>
+                <p class="text-gray-700 dark:text-gray-300">Only Managers can access the Dashboard.</p>
+              </div>
+            `}
+            ${currentPage === 'products' && html`<${ProductsPage} products=${products} setProducts=${setProducts} />`}
+          </div>
+        </div>
+      `;
+    }
+
+    render(html`<${App} />`, document.getElementById('app'));
+  </script>
+</body>
+</html>
